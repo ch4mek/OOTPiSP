@@ -4,6 +4,13 @@
     {
         private System.ComponentModel.IContainer components = null;
 
+        // ID фигуры
+        private System.Windows.Forms.Label labelShapeId;
+
+        // Имя фигуры
+        private System.Windows.Forms.Label labelShapeName;
+        private System.Windows.Forms.TextBox textShapeName;
+
         // Точка привязки
         private System.Windows.Forms.Label labelAnchor;
         private System.Windows.Forms.TextBox textAnchorX;
@@ -119,6 +126,9 @@
             this.textAngleValue = new System.Windows.Forms.TextBox();
             this.buttonSetAngle = new System.Windows.Forms.Button();
             this.separator4 = new System.Windows.Forms.Label();
+            this.labelShapeId = new System.Windows.Forms.Label();
+            this.labelShapeName = new System.Windows.Forms.Label();
+            this.textShapeName = new System.Windows.Forms.TextBox();
             this.SuspendLayout();
             
             // Шрифт для всех элементов
@@ -126,11 +136,43 @@
             System.Drawing.Font boldFont = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
             
             // 
+            // labelShapeId
+            // 
+            this.labelShapeId.AutoSize = true;
+            this.labelShapeId.Font = boldFont;
+            this.labelShapeId.Location = new System.Drawing.Point(10, 10);
+            this.labelShapeId.Name = "labelShapeId";
+            this.labelShapeId.Size = new System.Drawing.Size(100, 28);
+            this.labelShapeId.TabIndex = 100;
+            this.labelShapeId.Text = "ID: -";
+            
+            // 
+            // labelShapeName
+            // 
+            this.labelShapeName.AutoSize = true;
+            this.labelShapeName.Font = boldFont;
+            this.labelShapeName.Location = new System.Drawing.Point(10, 40);
+            this.labelShapeName.Name = "labelShapeName";
+            this.labelShapeName.Size = new System.Drawing.Size(60, 28);
+            this.labelShapeName.TabIndex = 101;
+            this.labelShapeName.Text = "Имя:";
+            
+            // 
+            // textShapeName
+            // 
+            this.textShapeName.Font = mainFont;
+            this.textShapeName.Location = new System.Drawing.Point(80, 37);
+            this.textShapeName.Name = "textShapeName";
+            this.textShapeName.Size = new System.Drawing.Size(250, 34);
+            this.textShapeName.TabIndex = 102;
+            this.textShapeName.TextChanged += new System.EventHandler(this.textShapeName_TextChanged);
+            
+            // 
             // labelAnchor
             // 
             this.labelAnchor.AutoSize = true;
             this.labelAnchor.Font = boldFont;
-            this.labelAnchor.Location = new System.Drawing.Point(10, 10);
+            this.labelAnchor.Location = new System.Drawing.Point(10, 75);
             this.labelAnchor.Name = "labelAnchor";
             this.labelAnchor.Size = new System.Drawing.Size(200, 28);
             this.labelAnchor.TabIndex = 0;
@@ -565,6 +607,9 @@
             this.Controls.Add(this.textAnchorX);
             this.Controls.Add(this.labelAnchorX);
             this.Controls.Add(this.labelAnchor);
+            this.Controls.Add(this.textShapeName);
+            this.Controls.Add(this.labelShapeName);
+            this.Controls.Add(this.labelShapeId);
             this.Name = "PropertiesPanel";
             this.Size = new System.Drawing.Size(350, 840);
             this.ResumeLayout(false);

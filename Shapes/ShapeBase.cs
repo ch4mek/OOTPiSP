@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Text.Json.Nodes;
 
 namespace OOTPiSP_LR1.Shapes
 {
@@ -41,6 +42,17 @@ namespace OOTPiSP_LR1.Shapes
     /// </summary>
     public abstract class ShapeBase
     {
+        private static int _nextId = 1;
+
+        public int Id { get; set; } = _nextId++;
+        public string ShapeName { get; set; } = "";
+
+        public virtual string DefaultTypeName => "Фигура";
+
+        public string DisplayName => string.IsNullOrEmpty(ShapeName)
+            ? $"{DefaultTypeName} #{Id}"
+            : ShapeName;
+
         /// <summary>
         /// Глобальная точка отсчёта фигуры в экранных координатах.
         /// Задаётся пользователем явно. При изменении — фигура визуально смещается.
@@ -937,6 +949,146 @@ namespace OOTPiSP_LR1.Shapes
         private static float Weight(float distance)
         {
             return 1.0f / (1.0f + distance * 0.01f);
+        }
+
+        #endregion
+
+        #region Сохранение/Загрузка
+
+        public virtual JsonObject Save()
+        {
+            var json = new JsonObject();
+            json["id"] = Id;
+            json["shapeName"] = ShapeName;
+            json["shapeType"] = GetType().Name;
+            json["globalOrigin"] = SavePoint(GlobalOrigin);
+            json["localAnchor"] = SavePoint(LocalAnchor);
+            json["anchorOffset"] = SavePoint(AnchorOffset);
+            json["anchorPos"] = AnchorPos.ToString();
+            json["fillColor"] = SaveColor(FillColor);
+            json["isChildOfComposite"] = IsChildOfComposite;
+
+            var bw = new JsonArray();
+            var bc = new JsonArray();
+            for (int i = 0; i < SideCount; i++)
+            {
+                bw.Add(BorderWidths[i]);
+                bc.Add(SaveColor(BorderColors[i]));
+            }
+            json["borderWidths"] = bw;
+            json["borderColors"] = bc;
+
+            if (DeformedVertices != null)
+            {
+                var dv = new JsonArray();
+                foreach (var v in DeformedVertices)
+                {
+                    dv.Add(SavePointF(v));
+                }
+                json["deformedVertices"] = dv;
+            }
+
+            return json;
+        }
+
+        protected void LoadCommon(JsonObject json)
+        {
+            if (json.ContainsKey("id"))
+                Id = json["id"]!.GetValue<int>();
+
+            if (json.ContainsKey("shapeName"))
+                ShapeName = json["shapeName"]!.GetValue<string>() ?? "";
+
+            GlobalOrigin = LoadPoint(json["globalOrigin"]!.AsObject());
+            LocalAnchor = LoadPoint(json["localAnchor"]!.AsObject());
+            AnchorOffset = LoadPoint(json["anchorOffset"]!.AsObject());
+            AnchorPos = Enum.Parse<AnchorPosition>(json["anchorPos"]!.GetValue<string>());
+            FillColor = LoadColor(json["fillColor"]!.GetValue<string>());
+            IsChildOfComposite = json["isChildOfComposite"]?.GetValue<bool>() ?? false;
+
+            if (json.ContainsKey("borderWidths") && json.ContainsKey("borderColors"))
+            {
+                var bw = json["borderWidths"]!.AsArray();
+                var bc = json["borderColors"]!.AsArray();
+                int borderCount = Math.Min(SideCount, Math.Min(bw.Count, bc.Count));
+                for (int i = 0; i < borderCount; i++)
+                {
+                    BorderWidths[i] = (float)bw[i]!.GetValue<double>();
+                    BorderColors[i] = LoadColor(bc[i]!.GetValue<string>());
+                }
+            }
+
+            if (json.ContainsKey("deformedVertices"))
+            {
+                var dv = json["deformedVertices"]!.AsArray();
+                var vertices = new PointF[dv.Count];
+                for (int i = 0; i < dv.Count; i++)
+                {
+                    vertices[i] = LoadPointF(dv[i]!.AsObject());
+                }
+                DeformedVertices = vertices;
+            }
+
+            UpdateVirtualBounds();
+        }
+
+        public static ShapeBase CreateFromJson(JsonObject json)
+        {
+            string? type = json["shapeType"]?.GetValue<string>();
+            return type switch
+            {
+                "CircleShape" => CircleShape.LoadFromJson(json),
+                "RectangleShape" => RectangleShape.LoadFromJson(json),
+                "TriangleShape" => TriangleShape.LoadFromJson(json),
+                "HexagonShape" => HexagonShape.LoadFromJson(json),
+                "TrapezoidShape" => TrapezoidShape.LoadFromJson(json),
+                "PolygonShape" => PolygonShape.LoadFromJson(json),
+                "CompositeShape" => CompositeShape.LoadFromJson(json),
+                "GroupShape" => GroupShape.LoadFromJson(json),
+                _ => throw new InvalidOperationException($"Unknown shape type: {type}")
+            };
+        }
+
+        protected static JsonObject SavePoint(Point p) => new() { ["x"] = p.X, ["y"] = p.Y };
+        protected static Point LoadPoint(JsonObject json) => new(json["x"]!.GetValue<int>(), json["y"]!.GetValue<int>());
+        protected static JsonObject SavePointF(PointF p) => new() { ["x"] = p.X, ["y"] = p.Y };
+        protected static PointF LoadPointF(JsonObject json) => new(json["x"]!.GetValue<float>(), json["y"]!.GetValue<float>());
+        protected static string SaveColor(Color c) => $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}";
+        protected static Color LoadColor(string hex)
+        {
+            if (hex.StartsWith("#")) hex = hex.Substring(1);
+            return Color.FromArgb(
+                byte.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber),
+                byte.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber),
+                byte.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber),
+                byte.Parse(hex.Substring(6, 2), System.Globalization.NumberStyles.HexNumber)
+            );
+        }
+
+        public static void SyncNextId(IEnumerable<ShapeBase> shapes)
+        {
+            int maxId = 0;
+            foreach (var shape in shapes)
+            {
+                CheckShapeId(shape, ref maxId);
+            }
+            _nextId = maxId + 1;
+        }
+
+        private static void CheckShapeId(ShapeBase shape, ref int maxId)
+        {
+            if (shape.Id > maxId) maxId = shape.Id;
+
+            if (shape is CompositeShape composite)
+            {
+                foreach (var child in composite.GetChildren())
+                    CheckShapeId(child, ref maxId);
+            }
+            else if (shape is GroupShape group)
+            {
+                foreach (var child in group.GetChildren())
+                    CheckShapeId(child, ref maxId);
+            }
         }
 
         #endregion

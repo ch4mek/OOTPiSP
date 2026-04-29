@@ -12,6 +12,8 @@ namespace OOTPiSP_LR1
         private readonly ShapeManager _shapeManager;
         private PropertiesPanel _propertiesPanel = null!;
         private bool _propertiesPanelVisible;
+        private ShapeListPanel _shapeListPanel = null!;
+        private bool _shapeListNeedsRefresh = true;
         
         // Отступ от краёв окна для виртуальных границ
         private const int CanvasMargin = 50;
@@ -93,6 +95,7 @@ namespace OOTPiSP_LR1
             
             // Создание панели свойств
             SetupPropertiesPanel();
+            SetupShapeListPanel();
             
             // Создание контекстного меню
             SetupCreateShapeMenu();
@@ -174,6 +177,43 @@ namespace OOTPiSP_LR1
             Controls.Add(_propertiesPanel);
         }
 
+        private void SetupShapeListPanel()
+        {
+            _shapeListPanel = new ShapeListPanel
+            {
+                Visible = true
+            };
+            _shapeListPanel.SetShapeManager(_shapeManager);
+            _shapeListPanel.ShapeSelected += ShapeListPanel_ShapeSelected;
+            Controls.Add(_shapeListPanel);
+        }
+
+        private void ShapeListPanel_ShapeSelected(object? sender, ShapeBase shape)
+        {
+            _shapeManager.SelectSingle(shape);
+            _shapeManager.BringToFront(shape);
+            if (_propertiesPanelVisible)
+            {
+                _propertiesPanel.SetShape(shape);
+            }
+            Invalidate();
+        }
+
+        private void RefreshShapeList()
+        {
+            _shapeListNeedsRefresh = true;
+        }
+
+        private void UpdateShapeListIfNeeded()
+        {
+            if (_shapeListNeedsRefresh)
+            {
+                _shapeListNeedsRefresh = false;
+                _shapeListPanel.RefreshList();
+                _shapeListPanel.SelectShape(_shapeManager.SelectedShape);
+            }
+        }
+
         /// <summary>
         /// Создать контекстное меню для добавления новых фигур
         /// </summary>
@@ -220,6 +260,12 @@ namespace OOTPiSP_LR1
             // Группировка
             _createShapeMenu.Items.Add("📦 Сгруппировать (Ctrl+G)", null, GroupShapes_Click!);
             _createShapeMenu.Items.Add("📂 Разгруппировать (Ctrl+Shift+G)", null, UngroupShape_Click!);
+
+            _createShapeMenu.Items.Add(new ToolStripSeparator());
+
+            _createShapeMenu.Items.Add("💾 Сохранить всё (Ctrl+S)", null, SaveShapes_Click!);
+            _createShapeMenu.Items.Add("💾 Сохранить выделенное", null, SaveSelectedShapes_Click!);
+            _createShapeMenu.Items.Add("📂 Импортировать фигуры", null, ImportShapes_Click!);
         }
 
         private void MainForm_Load(object? sender, EventArgs e)
@@ -230,6 +276,7 @@ namespace OOTPiSP_LR1
                 ClientSize.Height - 2 * CanvasMargin,
                 CanvasMargin
             );
+            RefreshShapeList();
             Invalidate();
         }
 
@@ -237,7 +284,7 @@ namespace OOTPiSP_LR1
         {
             UpdatePropertiesPanelSize();
             
-            if (_shapeManager.Shapes.Count == 0)
+            if (_shapeManager.ShapeCount == 0)
             {
                 _shapeManager.CreateInitialShapes(
                     ClientSize.Width - 2 * CanvasMargin, 
@@ -253,29 +300,29 @@ namespace OOTPiSP_LR1
         /// </summary>
         private void UpdatePropertiesPanelSize()
         {
-            // Панель свойств занимает 20% ширины экрана, но не менее 350 и не более 450
             int panelWidth = Math.Max(350, Math.Min(450, ClientSize.Width / 5));
-            
-            // Высота панели - 85% высоты экрана, но не менее 700
             int panelHeight = Math.Max(700, ClientSize.Height * 85 / 100);
-            
+
             _propertiesPanel.Size = new Size(panelWidth, panelHeight);
             _propertiesPanel.Location = new Point(10, 10);
-            
-            // Устанавливаем границы холста для ограничения позиции фигур
+
             _propertiesPanel.CanvasBounds = new Rectangle(
                 CanvasMargin,
                 CanvasMargin,
                 ClientSize.Width - 2 * CanvasMargin,
                 ClientSize.Height - 2 * CanvasMargin
             );
-            
-            // Обновляем внутренние контролы панели
+
             _propertiesPanel.UpdateLayout(panelWidth, panelHeight);
+
+            int listWidth = Math.Max(220, Math.Min(300, ClientSize.Width / 7));
+            _shapeListPanel.Size = new Size(listWidth, panelHeight);
+            _shapeListPanel.Location = new Point(ClientSize.Width - listWidth - 10, 10);
         }
 
         private void MainForm_Paint(object? sender, PaintEventArgs e)
         {
+            UpdateShapeListIfNeeded();
             e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             
             // Рисуем область для фигур (виртуальные границы с отступом)
@@ -374,6 +421,7 @@ namespace OOTPiSP_LR1
                     {
                         _propertiesPanel.SetShape(hitShape);
                     }
+                    RefreshShapeList();
                 }
                 else
                 {
@@ -392,6 +440,7 @@ namespace OOTPiSP_LR1
                         {
                             _propertiesPanel.SetShape(null);
                         }
+                        RefreshShapeList();
                     }
                 }
                 
@@ -557,6 +606,22 @@ namespace OOTPiSP_LR1
                 e.Handled = true;
                 return;
             }
+
+            // Ctrl+S — сохранить
+            if (e.Control && !e.Shift && e.KeyCode == Keys.S)
+            {
+                SaveShapesToFile();
+                e.Handled = true;
+                return;
+            }
+
+            // Ctrl+O — импортировать фигуры
+            if (e.Control && !e.Shift && e.KeyCode == Keys.O)
+            {
+                ImportShapesFromFile(new Point(ClientSize.Width / 2, ClientSize.Height / 2));
+                e.Handled = true;
+                return;
+            }
             
             switch (e.KeyCode)
             {
@@ -579,6 +644,7 @@ namespace OOTPiSP_LR1
 
         private void PropertiesPanel_ShapeChanged(object? sender, EventArgs e)
         {
+            RefreshShapeList();
             Invalidate();
         }
 
@@ -821,7 +887,7 @@ namespace OOTPiSP_LR1
             // Удаляем исходные фигуры из менеджера
             foreach (var shape in _shapeManager.SelectedShapes.ToList())
             {
-                _shapeManager.Shapes.Remove(shape);
+                _shapeManager.RemoveShape(shape);
             }
             
             // Добавляем новую объединённую фигуру
@@ -1307,6 +1373,119 @@ namespace OOTPiSP_LR1
                 g.FillRectangle(bgBrush, rect);
                 g.DrawString(modeText, font, brush, 
                     (ClientSize.Width - textSize.Width) / 2, 10);
+            }
+        }
+
+        #endregion
+
+        #region Сохранение/Загрузка
+
+        private void SaveShapes_Click(object? sender, EventArgs e)
+        {
+            SaveShapesToFile();
+        }
+
+        private void LoadShapes_Click(object? sender, EventArgs e)
+        {
+            ImportShapesFromFile(_menuClickLocation);
+        }
+
+        private void SaveSelectedShapes_Click(object? sender, EventArgs e)
+        {
+            SaveSelectedShapesToFile();
+        }
+
+        private void ImportShapes_Click(object? sender, EventArgs e)
+        {
+            ImportShapesFromFile(_menuClickLocation);
+        }
+
+        private void SaveShapesToFile()
+        {
+            using (var dialog = new SaveFileDialog())
+            {
+                dialog.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*";
+                dialog.DefaultExt = "json";
+                dialog.Title = "Сохранить все фигуры";
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        _shapeManager.SaveToFile(dialog.FileName);
+                        MessageBox.Show("Фигуры успешно сохранены", "Сохранение",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ошибка при сохранении: {ex.Message}", "Ошибка",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        private void SaveSelectedShapesToFile()
+        {
+            var selected = _shapeManager.SelectedShapes;
+            if (selected.Count == 0)
+            {
+                MessageBox.Show("Выберите фигуры для сохранения (клик с Ctrl)", "Сохранение",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            using (var dialog = new SaveFileDialog())
+            {
+                dialog.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*";
+                dialog.DefaultExt = "json";
+                dialog.Title = "Сохранить выделенные фигуры";
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        _shapeManager.SaveShapesToFile(dialog.FileName, selected);
+                        MessageBox.Show($"Сохранено фигур: {selected.Count}", "Сохранение",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ошибка при сохранении: {ex.Message}", "Ошибка",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        private void ImportShapesFromFile(Point location)
+        {
+            using (var dialog = new OpenFileDialog())
+            {
+                dialog.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*";
+                dialog.DefaultExt = "json";
+                dialog.Title = "Импортировать фигуры на полотно";
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        _shapeManager.ClearSelection();
+                        var imported = _shapeManager.AddFromFile(dialog.FileName, location);
+                        if (_propertiesPanelVisible)
+                        {
+                            _propertiesPanel.SetShape(null);
+                        }
+                        Invalidate();
+                        MessageBox.Show($"Импортировано фигур: {imported.Count}", "Импорт",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ошибка при импорте: {ex.Message}", "Ошибка",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
             }
         }
 

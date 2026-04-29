@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Text.Json.Nodes;
 
 namespace OOTPiSP_LR1.Shapes
 {
@@ -13,6 +14,7 @@ namespace OOTPiSP_LR1.Shapes
         public int Radius { get; set; }
 
         public override int SideCount => 3;
+        public override string DefaultTypeName => "Треугольник";
 
         public TriangleShape(Point anchor, int radius)
         {
@@ -161,6 +163,20 @@ namespace OOTPiSP_LR1.Shapes
             GlobalOrigin = new Point(center.X + AnchorOffset.X - LocalAnchor.X, 
                                      center.Y + AnchorOffset.Y - LocalAnchor.Y);
             UpdateVirtualBounds();
+        }
+
+        public override JsonObject Save()
+        {
+            var json = base.Save();
+            json["radius"] = Radius;
+            return json;
+        }
+
+        public static TriangleShape LoadFromJson(JsonObject json)
+        {
+            var shape = new TriangleShape(Point.Empty, json["radius"]!.GetValue<int>());
+            shape.LoadCommon(json);
+            return shape;
         }
     }
 }

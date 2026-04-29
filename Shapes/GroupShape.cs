@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Text.Json.Nodes;
 
 namespace OOTPiSP_LR1.Shapes
 {
@@ -31,6 +32,7 @@ namespace OOTPiSP_LR1.Shapes
         /// Количество сторон — сумма сторон всех дочерних фигур
         /// </summary>
         public override int SideCount => _children.Count > 0 ? _children.Sum(s => s.SideCount) : 0;
+        public override string DefaultTypeName => "Группа";
 
         /// <summary>
         /// Создать пустую группу
@@ -410,7 +412,55 @@ namespace OOTPiSP_LR1.Shapes
 
             UpdateVirtualBounds();
         }
+        #endregion
+
+        #region Сохранение/Загрузка
+
+        public override JsonObject Save()
+        {
+            var json = base.Save();
+
+            var children = new JsonArray();
+            foreach (var child in _children)
+            {
+                children.Add(child.Save());
+            }
+            json["children"] = children;
+            return json;
+        }
+
+        public static GroupShape LoadFromJson(JsonObject json)
+        {
+            var shape = new GroupShape();
+
+            if (json.ContainsKey("children"))
+            {
+                var childrenArray = json["children"]!.AsArray();
+                foreach (var childJson in childrenArray)
+                {
+                    if (childJson != null)
+                    {
+                        var child = ShapeBase.CreateFromJson(childJson.AsObject());
+                        shape.AddChild(child);
+                    }
+                }
+            }
+
+            shape.LoadCommon(json);
+
+            var bounds = shape.GetGroupBounds();
+            if (!bounds.IsEmpty)
+            {
+                shape.GlobalOrigin = new Point(
+                    bounds.X + bounds.Width / 2,
+                    bounds.Y + bounds.Height / 2
+                );
+            }
+
+            return shape;
+        }
 
         #endregion
+
     }
 }

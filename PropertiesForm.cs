@@ -53,6 +53,15 @@ namespace OOTPiSP_LR1
         public PropertiesPanel()
         {
             InitializeComponent();
+
+            int shiftY = 35;
+            foreach (Control c in Controls)
+            {
+                if (c != labelShapeId && c != labelShapeName && c != textShapeName)
+                {
+                    c.Location = new Point(c.Location.X, c.Location.Y + shiftY);
+                }
+            }
         }
 
         /// <summary>
@@ -145,6 +154,12 @@ namespace OOTPiSP_LR1
                 return;
             }
 
+            labelShapeId.Text = $"ID: {_shape.Id}  ({_shape.GetType().Name})";
+
+            textShapeName.TextChanged -= textShapeName_TextChanged;
+            textShapeName.Text = _shape.ShapeName;
+            textShapeName.TextChanged += textShapeName_TextChanged;
+
             // Глобальная точка отсчёта фигуры
             textAnchorX.Text = _shape.GlobalOrigin.X.ToString();
             textAnchorY.Text = _shape.GlobalOrigin.Y.ToString();
@@ -181,6 +196,10 @@ namespace OOTPiSP_LR1
 
         private void ClearProperties()
         {
+            labelShapeId.Text = "ID: -";
+            textShapeName.TextChanged -= textShapeName_TextChanged;
+            textShapeName.Text = "";
+            textShapeName.TextChanged += textShapeName_TextChanged;
             textAnchorX.Text = "";
             textAnchorY.Text = "";
             textLocalAnchorX.Text = "";
@@ -424,6 +443,15 @@ namespace OOTPiSP_LR1
             // Обновляем отображение
             UpdateProperties();
             ShapeChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void textShapeName_TextChanged(object? sender, EventArgs e)
+        {
+            if (_shape != null)
+            {
+                _shape.ShapeName = textShapeName.Text;
+                ShapeChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         private void panelFillColor_Click(object sender, EventArgs e)

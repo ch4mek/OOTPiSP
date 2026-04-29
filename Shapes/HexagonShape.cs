@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Text.Json.Nodes;
 
 namespace OOTPiSP_LR1.Shapes
 {
@@ -13,6 +14,7 @@ namespace OOTPiSP_LR1.Shapes
         public int Radius { get; set; }
 
         public override int SideCount => 6;
+        public override string DefaultTypeName => "Шестиугольник";
 
         public HexagonShape(Point anchor, int radius)
         {
@@ -149,6 +151,20 @@ namespace OOTPiSP_LR1.Shapes
             GlobalOrigin = new Point(center.X + AnchorOffset.X - LocalAnchor.X, 
                                      center.Y + AnchorOffset.Y - LocalAnchor.Y);
             UpdateVirtualBounds();
+        }
+
+        public override JsonObject Save()
+        {
+            var json = base.Save();
+            json["radius"] = Radius;
+            return json;
+        }
+
+        public static HexagonShape LoadFromJson(JsonObject json)
+        {
+            var shape = new HexagonShape(Point.Empty, json["radius"]!.GetValue<int>());
+            shape.LoadCommon(json);
+            return shape;
         }
     }
 }

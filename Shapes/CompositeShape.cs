@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Text.Json.Nodes;
 
 namespace OOTPiSP_LR1.Shapes
 {
@@ -61,6 +62,8 @@ namespace OOTPiSP_LR1.Shapes
                 }
             }
         }
+
+        public override string DefaultTypeName => "Составная фигура";
 
         /// <summary>
         /// Режим отображения: true - показывать отдельные фигуры, false - объединённый контур
@@ -709,5 +712,49 @@ namespace OOTPiSP_LR1.Shapes
         }
 
         #endregion
+
+        #region Сохранение/Загрузка
+
+        public override JsonObject Save()
+        {
+            var json = base.Save();
+            json["isExpanded"] = _isExpanded;
+
+            var children = new JsonArray();
+            foreach (var child in _childShapes)
+            {
+                children.Add(child.Save());
+            }
+            json["children"] = children;
+            return json;
+        }
+
+        public static CompositeShape LoadFromJson(JsonObject json)
+        {
+            var shape = new CompositeShape();
+
+            if (json.ContainsKey("children"))
+            {
+                var childrenArray = json["children"]!.AsArray();
+                foreach (var childJson in childrenArray)
+                {
+                    if (childJson != null)
+                    {
+                        var child = ShapeBase.CreateFromJson(childJson.AsObject());
+                        shape.AddChild(child);
+                    }
+                }
+            }
+
+            shape.LoadCommon(json);
+
+            if (json.ContainsKey("isExpanded"))
+                shape.IsExpanded = json["isExpanded"]!.GetValue<bool>();
+
+            return shape;
+        }
+
+        #endregion
+
     }
 }

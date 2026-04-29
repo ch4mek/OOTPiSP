@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Text.Json.Nodes;
 
 namespace OOTPiSP_LR1.Shapes
 {
@@ -28,6 +29,7 @@ namespace OOTPiSP_LR1.Shapes
 
         // У окружности только одна "сторона"
         public override int SideCount => 1;
+        public override string DefaultTypeName => "Окружность";
 
         public CircleShape(Point anchor, int radius)
         {
@@ -157,18 +159,30 @@ namespace OOTPiSP_LR1.Shapes
 
         public override void SetSideLength(int sideIndex, float length)
         {
-            // Длина окружности = 2 * PI * Radius => Radius = length / (2 * PI)
             if (length > 0)
             {
                 Radius = Math.Max(10, (int)(length / (2 * Math.PI)));
                 
-                // Пересчитываем смещение точки привязки
                 AnchorOffset = CalculateAnchorOffset(AnchorPos);
                 var center = GetCenter();
                 GlobalOrigin = new Point(center.X + AnchorOffset.X - LocalAnchor.X, 
                                          center.Y + AnchorOffset.Y - LocalAnchor.Y);
                 UpdateVirtualBounds();
             }
+        }
+
+        public override JsonObject Save()
+        {
+            var json = base.Save();
+            json["radius"] = Radius;
+            return json;
+        }
+
+        public static CircleShape LoadFromJson(JsonObject json)
+        {
+            var shape = new CircleShape(Point.Empty, json["radius"]!.GetValue<int>());
+            shape.LoadCommon(json);
+            return shape;
         }
     }
 }

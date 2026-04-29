@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Text.Json.Nodes;
 
 namespace OOTPiSP_LR1.Shapes
 {
@@ -19,6 +20,7 @@ namespace OOTPiSP_LR1.Shapes
         public int Height { get; set; }
 
         public override int SideCount => 4;
+        public override string DefaultTypeName => "Трапеция";
 
         public TrapezoidShape(Point anchor, int bottomWidth, int topWidth, int height)
         {
@@ -182,6 +184,27 @@ namespace OOTPiSP_LR1.Shapes
             GlobalOrigin = new Point(center.X + AnchorOffset.X - LocalAnchor.X, 
                                      center.Y + AnchorOffset.Y - LocalAnchor.Y);
             UpdateVirtualBounds();
+        }
+
+        public override JsonObject Save()
+        {
+            var json = base.Save();
+            json["bottomWidth"] = BottomWidth;
+            json["topWidth"] = TopWidth;
+            json["height"] = Height;
+            return json;
+        }
+
+        public static TrapezoidShape LoadFromJson(JsonObject json)
+        {
+            var shape = new TrapezoidShape(
+                Point.Empty,
+                json["bottomWidth"]!.GetValue<int>(),
+                json["topWidth"]!.GetValue<int>(),
+                json["height"]!.GetValue<int>()
+            );
+            shape.LoadCommon(json);
+            return shape;
         }
     }
 }

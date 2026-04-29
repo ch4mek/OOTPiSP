@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Text.Json.Nodes;
 
 namespace OOTPiSP_LR1.Shapes
 {
@@ -74,6 +75,7 @@ namespace OOTPiSP_LR1.Shapes
         /// Количество сторон равно количеству отрезков
         /// </summary>
         public override int SideCount => Segments.Count;
+        public override string DefaultTypeName => "Многоугольник";
 
         /// <summary>
         /// Создаёт пустой многоугольник в указанной точке
@@ -727,6 +729,46 @@ namespace OOTPiSP_LR1.Shapes
             }
 
             return polygon;
+        }
+
+        public override JsonObject Save()
+        {
+            var json = base.Save();
+            json["isClosed"] = IsClosed;
+            json["originPoint"] = SavePointF(OriginPoint);
+
+            var segs = new JsonArray();
+            foreach (var seg in Segments)
+            {
+                segs.Add(new JsonObject { ["length"] = seg.Length, ["angleDegrees"] = seg.AngleDegrees });
+            }
+            json["segments"] = segs;
+            return json;
+        }
+
+        public static PolygonShape LoadFromJson(JsonObject json)
+        {
+            var originPt = json.ContainsKey("originPoint") ? LoadPointF(json["originPoint"]!.AsObject()) : PointF.Empty;
+            var shape = new PolygonShape(Point.Empty, originPt);
+
+            if (json.ContainsKey("segments"))
+            {
+                var segs = json["segments"]!.AsArray();
+                foreach (var segNode in segs)
+                {
+                    var segObj = segNode!.AsObject();
+                    shape.AddSegmentByLengthAngle(
+                        (float)segObj["length"]!.GetValue<double>(),
+                        (float)segObj["angleDegrees"]!.GetValue<double>()
+                    );
+                }
+            }
+
+            if (json.ContainsKey("isClosed"))
+                shape.IsClosed = json["isClosed"]!.GetValue<bool>();
+
+            shape.LoadCommon(json);
+            return shape;
         }
     }
 }

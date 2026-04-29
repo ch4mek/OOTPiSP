@@ -1,67 +1,120 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
 using OOTPiSP_LR1.Shapes;
 
 namespace OOTPiSP_LR1.Core
 {
-    /// <summary>
-    /// Менеджер фигур - управляет коллекцией фигур на холсте
-    /// </summary>
     public class ShapeManager
     {
-        public List<ShapeBase> Shapes { get; } = new();
+        private ShapeBase[] _shapes = new ShapeBase[16];
+        private int _count;
+
+        public int ShapeCount => _count;
 
         public ShapeBase? SelectedShape { get; private set; }
-        
-        /// <summary>
-        /// Список всех выделенных фигур (для множественного выделения с Ctrl)
-        /// </summary>
+
         public List<ShapeBase> SelectedShapes { get; } = new();
 
-        /// <summary>
-        /// Добавить фигуру в коллекцию
-        /// </summary>
-        public void AddShape(ShapeBase shape) => Shapes.Add(shape);
+        public ShapeBase GetShape(int index)
+        {
+            if (index < 0 || index >= _count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+            return _shapes[index];
+        }
 
-        /// <summary>
-        /// Удалить фигуру из коллекции
-        /// </summary>
+        public IEnumerable<ShapeBase> GetAllShapes()
+        {
+            for (int i = 0; i < _count; i++)
+                yield return _shapes[i];
+        }
+
+        private void EnsureCapacity(int minCapacity)
+        {
+            if (_shapes.Length < minCapacity)
+            {
+                int newCapacity = Math.Max(minCapacity, _shapes.Length * 2);
+                var newArray = new ShapeBase[newCapacity];
+                Array.Copy(_shapes, newArray, _count);
+                _shapes = newArray;
+            }
+        }
+
+        private int IndexOf(ShapeBase shape)
+        {
+            for (int i = 0; i < _count; i++)
+            {
+                if (ReferenceEquals(_shapes[i], shape))
+                    return i;
+            }
+            return -1;
+        }
+
+        public void AddShape(ShapeBase shape)
+        {
+            EnsureCapacity(_count + 1);
+            _shapes[_count++] = shape;
+        }
+
         public void RemoveShape(ShapeBase shape)
         {
+            int index = IndexOf(shape);
+            if (index < 0) return;
+
             if (shape == SelectedShape)
                 SelectedShape = null;
-            Shapes.Remove(shape);
+
+            for (int i = index; i < _count - 1; i++)
+            {
+                _shapes[i] = _shapes[i + 1];
+            }
+            _shapes[--_count] = null!;
         }
 
-        /// <summary>
-        /// Отрисовать все фигуры
-        /// </summary>
+        private void InsertAt(int index, ShapeBase shape)
+        {
+            if (index < 0 || index > _count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+            EnsureCapacity(_count + 1);
+            for (int i = _count; i > index; i--)
+            {
+                _shapes[i] = _shapes[i - 1];
+            }
+            _shapes[index] = shape;
+            _count++;
+        }
+
+        private void ClearAll()
+        {
+            Array.Clear(_shapes, 0, _count);
+            _count = 0;
+        }
+
         public void DrawAll(Graphics g)
         {
-            foreach (var s in Shapes)
-                s.Draw(g);
+            for (int i = 0; i < _count; i++)
+                _shapes[i].Draw(g);
         }
 
-        /// <summary>
-        /// Найти фигуру по точке (сверху вниз по z-порядку)
-        /// </summary>
         public ShapeBase? HitTest(Point p)
         {
-            for (int i = Shapes.Count - 1; i >= 0; i--)
+            for (int i = _count - 1; i >= 0; i--)
             {
-                if (Shapes[i].HitTest(p))
-                    return Shapes[i];
+                if (_shapes[i].HitTest(p))
+                    return _shapes[i];
             }
             return null;
         }
 
-        /// <summary>
-        /// Выбрать фигуру
-        /// </summary>
         public void Select(ShapeBase? shape)
         {
-            foreach (var s in Shapes)
-                s.IsSelected = false;
+            for (int i = 0; i < _count; i++)
+                _shapes[i].IsSelected = false;
 
             SelectedShape = shape;
 
@@ -69,33 +122,23 @@ namespace OOTPiSP_LR1.Core
                 shape.IsSelected = true;
         }
 
-        /// <summary>
-        /// Снять выделение со всех фигур
-        /// </summary>
         public void ClearSelection()
         {
-            foreach (var s in Shapes)
-                s.IsSelected = false;
+            for (int i = 0; i < _count; i++)
+                _shapes[i].IsSelected = false;
             SelectedShape = null;
             SelectedShapes.Clear();
         }
-        
-        /// <summary>
-        /// Переключить выделение фигуры (для множественного выделения с Ctrl)
-        /// </summary>
-        /// <param name="shape">Фигура для переключения выделения</param>
-        /// <returns>true если фигура стала выделенной, false если снято выделение</returns>
+
         public bool ToggleSelection(ShapeBase shape)
         {
             if (shape == null) return false;
-            
+
             if (SelectedShapes.Contains(shape))
             {
-                // Снимаем выделение
                 shape.IsSelected = false;
                 SelectedShapes.Remove(shape);
-                
-                // Обновляем основную выбранную фигуру
+
                 if (SelectedShape == shape)
                 {
                     SelectedShape = SelectedShapes.Count > 0 ? SelectedShapes[0] : null;
@@ -104,17 +147,13 @@ namespace OOTPiSP_LR1.Core
             }
             else
             {
-                // Добавляем в выделенные
                 shape.IsSelected = true;
                 SelectedShapes.Add(shape);
                 SelectedShape = shape;
                 return true;
             }
         }
-        
-        /// <summary>
-        /// Добавить фигуру к выделению (без очистки предыдущих)
-        /// </summary>
+
         public void AddToSelection(ShapeBase shape)
         {
             if (shape == null) return;
@@ -125,19 +164,15 @@ namespace OOTPiSP_LR1.Core
             }
             SelectedShape = shape;
         }
-        
-        /// <summary>
-        /// Очистить множественное выделение и выбрать одну фигуру
-        /// </summary>
+
         public void SelectSingle(ShapeBase? shape)
         {
-            // Снимаем выделение со всех
-            foreach (var s in Shapes)
-                s.IsSelected = false;
-            
+            for (int i = 0; i < _count; i++)
+                _shapes[i].IsSelected = false;
+
             SelectedShapes.Clear();
             SelectedShape = shape;
-            
+
             if (shape != null)
             {
                 shape.IsSelected = true;
@@ -145,28 +180,26 @@ namespace OOTPiSP_LR1.Core
             }
         }
 
-        /// <summary>
-        /// Переместить выбранную фигуру на передний план
-        /// </summary>
         public void BringToFront(ShapeBase shape)
         {
-            if (Shapes.Remove(shape))
+            int index = IndexOf(shape);
+            if (index < 0) return;
+
+            for (int i = index; i < _count - 1; i++)
             {
-                Shapes.Add(shape);
+                _shapes[i] = _shapes[i + 1];
             }
+            _shapes[_count - 1] = shape;
         }
 
-        /// <summary>
-        /// Создать начальный набор из 5 фигур с учётом отступов
-        /// </summary>
         public void CreateInitialShapes(int canvasWidth, int canvasHeight, int margin = 50)
         {
-            Shapes.Clear();
+            ClearAll();
             SelectedShape = null;
+            SelectedShapes.Clear();
 
             int spacing = canvasWidth / 5;
 
-            // 1. Окружность
             var circle = new CircleShape(
                 new Point(margin + spacing / 2, margin + canvasHeight / 2),
                 120
@@ -175,9 +208,8 @@ namespace OOTPiSP_LR1.Core
                 FillColor = Color.LightBlue
             };
             circle.SetBorder(0, 15f, Color.DarkBlue);
-            Shapes.Add(circle);
+            AddShape(circle);
 
-            // 2. Прямоугольник
             var rect = new RectangleShape(
                 new Point(margin + spacing + spacing / 2, margin + canvasHeight / 2),
                 240, 160
@@ -185,13 +217,12 @@ namespace OOTPiSP_LR1.Core
             {
                 FillColor = Color.LightGreen
             };
-            rect.SetBorder(0, 8f, Color.DarkGreen);    // Верх - тонкая
-            rect.SetBorder(1, 25f, Color.Blue);        // Право - очень толстая
-            rect.SetBorder(2, 15f, Color.Red);         // Низ - средняя
-            rect.SetBorder(3, 35f, Color.Purple);      // Лево - супер толстая
-            Shapes.Add(rect);
+            rect.SetBorder(0, 8f, Color.DarkGreen);
+            rect.SetBorder(1, 25f, Color.Blue);
+            rect.SetBorder(2, 15f, Color.Red);
+            rect.SetBorder(3, 35f, Color.Purple);
+            AddShape(rect);
 
-            // 3. Треугольник
             var triangle = new TriangleShape(
                 new Point(margin + 2 * spacing + spacing / 2, margin + canvasHeight / 2),
                 140
@@ -199,12 +230,11 @@ namespace OOTPiSP_LR1.Core
             {
                 FillColor = Color.LightYellow
             };
-            triangle.SetBorder(0, 10f, Color.Orange);      // Сторона 1 - тонкая
-            triangle.SetBorder(1, 28f, Color.DarkBlue);    // Сторона 2 - толстая
-            triangle.SetBorder(2, 45f, Color.Crimson);     // Сторона 3 - супер толстая
-            Shapes.Add(triangle);
+            triangle.SetBorder(0, 10f, Color.Orange);
+            triangle.SetBorder(1, 28f, Color.DarkBlue);
+            triangle.SetBorder(2, 45f, Color.Crimson);
+            AddShape(triangle);
 
-            // 4. Шестиугольник
             var hexagon = new HexagonShape(
                 new Point(margin + 3 * spacing + spacing / 2, margin + canvasHeight / 2),
                 120
@@ -212,15 +242,14 @@ namespace OOTPiSP_LR1.Core
             {
                 FillColor = Color.LightPink
             };
-            hexagon.SetBorder(0, 8f, Color.Purple);        // Сторона 0 - тонкая
-            hexagon.SetBorder(1, 18f, Color.Teal);         // Сторона 1 - средняя
-            hexagon.SetBorder(2, 30f, Color.Navy);         // Сторона 2 - толстая
-            hexagon.SetBorder(3, 12f, Color.Maroon);       // Сторона 3 - средне-тонкая
-            hexagon.SetBorder(4, 40f, Color.DarkGreen);    // Сторона 4 - супер толстая
-            hexagon.SetBorder(5, 22f, Color.SaddleBrown);  // Сторона 5 - толстая
-            Shapes.Add(hexagon);
+            hexagon.SetBorder(0, 8f, Color.Purple);
+            hexagon.SetBorder(1, 18f, Color.Teal);
+            hexagon.SetBorder(2, 30f, Color.Navy);
+            hexagon.SetBorder(3, 12f, Color.Maroon);
+            hexagon.SetBorder(4, 40f, Color.DarkGreen);
+            hexagon.SetBorder(5, 22f, Color.SaddleBrown);
+            AddShape(hexagon);
 
-            // 5. Трапеция
             var trapezoid = new TrapezoidShape(
                 new Point(margin + 4 * spacing + spacing / 2, margin + canvasHeight / 2),
                 280, 160, 160
@@ -228,13 +257,12 @@ namespace OOTPiSP_LR1.Core
             {
                 FillColor = Color.LightCoral
             };
-            trapezoid.SetBorder(0, 12f, Color.DarkRed);     // Верх - тонкая
-            trapezoid.SetBorder(1, 40f, Color.Blue);        // Право - супер толстая
-            trapezoid.SetBorder(2, 20f, Color.DarkGreen);   // Низ - средняя
-            trapezoid.SetBorder(3, 6f, Color.Purple);       // Лево - самая тонкая
-            Shapes.Add(trapezoid);
+            trapezoid.SetBorder(0, 12f, Color.DarkRed);
+            trapezoid.SetBorder(1, 40f, Color.Blue);
+            trapezoid.SetBorder(2, 20f, Color.DarkGreen);
+            trapezoid.SetBorder(3, 6f, Color.Purple);
+            AddShape(trapezoid);
 
-            // 6. Произвольный многоугольник (PolygonShape) - пятиугольник
             var pentagon = new PolygonShape(
                 new Point(margin + 5 * spacing / 2, margin + canvasHeight / 2 + 200),
                 new PointF(0, -80)
@@ -243,129 +271,222 @@ namespace OOTPiSP_LR1.Core
                 FillColor = Color.Lavender,
                 IsClosed = true
             };
-            // Добавляем 5 отрезков для пятиугольника
-            pentagon.AddSegmentByLengthAngle(95f, 54f);     // Первый отрезок
-            pentagon.AddSegmentByLengthAngle(95f, 72f);     // Второй отрезок
-            pentagon.AddSegmentByLengthAngle(95f, 72f);     // Третий отрезок
-            pentagon.AddSegmentByLengthAngle(95f, 72f);     // Четвёртый отрезок
-            pentagon.AddSegmentByLengthAngle(95f, 72f);     // Пятый отрезок
+            pentagon.AddSegmentByLengthAngle(95f, 54f);
+            pentagon.AddSegmentByLengthAngle(95f, 72f);
+            pentagon.AddSegmentByLengthAngle(95f, 72f);
+            pentagon.AddSegmentByLengthAngle(95f, 72f);
+            pentagon.AddSegmentByLengthAngle(95f, 72f);
             pentagon.SetBorder(0, 10f, Color.Indigo);
             pentagon.SetBorder(1, 15f, Color.Violet);
             pentagon.SetBorder(2, 8f, Color.Plum);
             pentagon.SetBorder(3, 20f, Color.MediumPurple);
             pentagon.SetBorder(4, 12f, Color.DarkViolet);
-            Shapes.Add(pentagon);
+            AddShape(pentagon);
         }
 
         #region Операции группировки
 
-        /// <summary>
-        /// Получить список выбранных фигур
-        /// </summary>
-        /// <returns>Список выбранных фигур</returns>
         public List<ShapeBase> GetSelectedShapes()
         {
             return new List<ShapeBase>(SelectedShapes);
         }
 
-        /// <summary>
-        /// Сгруппировать выбранные фигуры в GroupShape.
-        /// Заменяет выбранные фигуры на группу в списке Shapes.
-        /// </summary>
-        /// <returns>Созданная группа или null, если меньше 2 фигур выбрано</returns>
         public GroupShape? GroupSelectedShapes()
         {
-            // 1. Получить выбранные фигуры
             var selectedShapes = GetSelectedShapes();
 
-            // 2. Если меньше 2 фигур - вернуть null
             if (selectedShapes.Count < 2)
                 return null;
 
-            // 3. Создать GroupShape через GroupShape.CreateFromShapes()
             var group = GroupShape.CreateFromShapes(selectedShapes);
             if (group == null)
                 return null;
 
-            // 4. Удалить выбранные фигуры из Shapes
             foreach (var shape in selectedShapes)
             {
-                Shapes.Remove(shape);
+                RemoveShapeInternal(shape);
             }
 
-            // 5. Добавить группу в Shapes
-            Shapes.Add(group);
+            AddShape(group);
 
-            // 6. Очистить выбор
             ClearSelection();
-
-            // 7. Выбрать группу
             SelectSingle(group);
 
-            // 8. Вернуть группу
             return group;
         }
 
-        /// <summary>
-        /// Разгруппировать выбранную фигуру (если это GroupShape).
-        /// Заменяет группу на отдельные фигуры в списке Shapes.
-        /// </summary>
-        /// <returns>Список разгруппированных фигур или null, если выбранная фигура не группа</returns>
         public List<ShapeBase>? UngroupSelectedShape()
         {
-            // 1. Получить первую выбранную фигуру
             if (SelectedShape == null)
                 return null;
 
-            // 2. Проверить, является ли она GroupShape
             if (SelectedShape is not GroupShape group)
                 return null;
 
-            // 3. Найти позицию группы в списке
-            int groupIndex = Shapes.IndexOf(group);
+            int groupIndex = IndexOf(group);
 
-            // 4. Вызвать group.Ungroup() для получения детей
             var children = group.Ungroup();
 
-            // 5. Удалить группу из Shapes
-            Shapes.Remove(group);
+            RemoveShapeInternal(group);
 
-            // 6. Добавить детей в Shapes (в ту же позицию или в конец)
             if (groupIndex >= 0)
             {
-                // Вставляем в ту же позицию, где была группа
                 foreach (var child in children)
                 {
-                    Shapes.Insert(groupIndex, child);
+                    InsertAt(groupIndex, child);
                     groupIndex++;
                 }
             }
             else
             {
-                // Если позиция не найдена, добавляем в конец
-                Shapes.AddRange(children);
+                foreach (var child in children)
+                {
+                    AddShape(child);
+                }
             }
 
-            // 7. Очистить выбор
             ClearSelection();
 
-            // 8. Выбрать разгруппированные фигуры
             foreach (var child in children)
             {
                 AddToSelection(child);
             }
 
-            // 9. Вернуть список детей
             return children;
         }
 
-        /// <summary>
-        /// Проверить, является ли выбранная фигура группой.
-        /// </summary>
-        /// <returns>true если первая выбранная фигура - GroupShape</returns>
         public bool IsSelectedShapeGroup()
         {
             return SelectedShape is GroupShape;
+        }
+
+        private void RemoveShapeInternal(ShapeBase shape)
+        {
+            int index = IndexOf(shape);
+            if (index < 0) return;
+
+            for (int i = index; i < _count - 1; i++)
+            {
+                _shapes[i] = _shapes[i + 1];
+            }
+            _shapes[--_count] = null!;
+        }
+
+        #endregion
+
+        #region Сохранение/Загрузка
+
+        public void SaveToFile(string path)
+        {
+            SaveShapesToFile(path, GetAllShapes());
+        }
+
+        public void SaveShapesToFile(string path, IEnumerable<ShapeBase> shapes)
+        {
+            var root = new JsonObject();
+            var shapesArray = new JsonArray();
+            foreach (var shape in shapes)
+            {
+                shapesArray.Add(shape.Save());
+            }
+            root["shapes"] = shapesArray;
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            options.TypeInfoResolver = new DefaultJsonTypeInfoResolver();
+            var jsonString = root.ToJsonString(options);
+            File.WriteAllText(path, jsonString);
+        }
+
+        public List<ShapeBase> AddFromFile(string path, Point targetCenter)
+        {
+            string text = File.ReadAllText(path);
+            var node = JsonNode.Parse(text);
+            if (node == null)
+                throw new InvalidDataException("Файл пуст или содержит невалидный JSON");
+
+            var json = node.AsObject();
+            if (!json.ContainsKey("shapes"))
+                throw new InvalidDataException("Файл не содержит данных фигр (отсутствует ключ 'shapes')");
+
+            var shapesNode = json["shapes"];
+            if (shapesNode == null)
+                throw new InvalidDataException("Данные фигр отсутствуют");
+
+            var shapesArray = shapesNode.AsArray();
+
+            var tempShapes = new List<ShapeBase>();
+            foreach (var shapeNode in shapesArray)
+            {
+                if (shapeNode != null)
+                {
+                    var shape = ShapeBase.CreateFromJson(shapeNode.AsObject());
+                    shape.IsSelected = false;
+                    shape.IsChildOfComposite = false;
+                    tempShapes.Add(shape);
+                }
+            }
+
+            int minX = int.MaxValue, minY = int.MaxValue;
+            int maxX = int.MinValue, maxY = int.MinValue;
+            foreach (var s in tempShapes)
+            {
+                var tl = s.GetVirtualTopLeft();
+                var br = s.GetVirtualBottomRight();
+                if (tl.X < minX) minX = tl.X;
+                if (tl.Y < minY) minY = tl.Y;
+                if (br.X > maxX) maxX = br.X;
+                if (br.Y > maxY) maxY = br.Y;
+            }
+
+            int centerX = (minX + maxX) / 2;
+            int centerY = (minY + maxY) / 2;
+            int dx = targetCenter.X - centerX;
+            int dy = targetCenter.Y - centerY;
+
+            var loadedShapes = new List<ShapeBase>();
+            foreach (var shape in tempShapes)
+            {
+                shape.MoveBy(dx, dy);
+                AddShape(shape);
+                loadedShapes.Add(shape);
+            }
+
+            ShapeBase.SyncNextId(GetAllShapes());
+            return loadedShapes;
+        }
+
+        public void LoadFromFile(string path)
+        {
+            string text = File.ReadAllText(path);
+            var node = JsonNode.Parse(text);
+            if (node == null)
+                throw new InvalidDataException("Файл пуст или содержит невалидный JSON");
+
+            var json = node.AsObject();
+            if (!json.ContainsKey("shapes"))
+                throw new InvalidDataException("Файл не содержит данных фигур (отсутствует ключ 'shapes')");
+
+            var shapesNode = json["shapes"];
+            if (shapesNode == null)
+                throw new InvalidDataException("Данные фигр отсутствуют");
+
+            var shapesArray = shapesNode.AsArray();
+
+            ClearAll();
+            ClearSelection();
+
+            foreach (var shapeNode in shapesArray)
+            {
+                if (shapeNode != null)
+                {
+                    var shape = ShapeBase.CreateFromJson(shapeNode.AsObject());
+                    shape.IsSelected = false;
+                    shape.IsChildOfComposite = false;
+                    AddShape(shape);
+                }
+            }
+
+            ShapeBase.SyncNextId(GetAllShapes());
         }
 
         #endregion

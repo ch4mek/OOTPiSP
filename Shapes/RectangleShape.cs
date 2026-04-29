@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Text.Json.Nodes;
 
 namespace OOTPiSP_LR1.Shapes
 {
@@ -16,6 +17,7 @@ namespace OOTPiSP_LR1.Shapes
         public int Height { get; set; }
 
         public override int SideCount => 4;
+        public override string DefaultTypeName => "Прямоугольник";
 
         public RectangleShape(Point anchor, int width, int height)
         {
@@ -168,6 +170,21 @@ namespace OOTPiSP_LR1.Shapes
             GlobalOrigin = new Point(center.X + AnchorOffset.X - LocalAnchor.X, 
                                      center.Y + AnchorOffset.Y - LocalAnchor.Y);
             UpdateVirtualBounds();
+        }
+
+        public override JsonObject Save()
+        {
+            var json = base.Save();
+            json["width"] = Width;
+            json["height"] = Height;
+            return json;
+        }
+
+        public static RectangleShape LoadFromJson(JsonObject json)
+        {
+            var shape = new RectangleShape(Point.Empty, json["width"]!.GetValue<int>(), json["height"]!.GetValue<int>());
+            shape.LoadCommon(json);
+            return shape;
         }
     }
 }
