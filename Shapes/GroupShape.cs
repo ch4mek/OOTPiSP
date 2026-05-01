@@ -273,6 +273,16 @@ namespace OOTPiSP_LR1.Shapes
             return false;
         }
 
+        public ShapeBase? HitTestChild(Point p)
+        {
+            for (int i = _children.Count - 1; i >= 0; i--)
+            {
+                if (_children[i].HitTest(p))
+                    return _children[i];
+            }
+            return null;
+        }
+
         public override void Resize(float scaleFactor)
         {
             if (_children.Count == 0) return;

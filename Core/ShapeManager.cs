@@ -360,6 +360,37 @@ namespace OOTPiSP_LR1.Core
             return SelectedShape is GroupShape;
         }
 
+        public bool AddShapeToGroup(ShapeBase shape, GroupShape group)
+        {
+            if (shape == null || group == null) return false;
+            if (shape == group) return false;
+            if (IndexOf(shape) < 0) return false;
+
+            group.AddChild(shape);
+            RemoveShapeInternal(shape);
+            return true;
+        }
+
+        public ShapeBase? RemoveShapeFromGroup(ShapeBase child, GroupShape group)
+        {
+            if (child == null || group == null) return null;
+            if (!group.RemoveChild(child)) return null;
+
+            int groupIndex = IndexOf(group);
+            if (groupIndex >= 0)
+                InsertAt(groupIndex + 1, child);
+            else
+                AddShape(child);
+
+            if (group.ChildCount == 0)
+            {
+                var children = group.Ungroup();
+                RemoveShapeInternal(group);
+            }
+
+            return child;
+        }
+
         private void RemoveShapeInternal(ShapeBase shape)
         {
             int index = IndexOf(shape);

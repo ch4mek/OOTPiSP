@@ -12,6 +12,7 @@ namespace OOTPiSP_LR1
         private readonly ShapeManager _shapeManager;
         private PropertiesPanel _propertiesPanel = null!;
         private bool _propertiesPanelVisible;
+        private bool _shapeListPanelVisible = true;
         private ShapeListPanel _shapeListPanel = null!;
         private bool _shapeListNeedsRefresh = true;
         
@@ -57,6 +58,11 @@ namespace OOTPiSP_LR1
         /// </summary>
         private PolygonShape? _drawingShape;
 
+        // === Режим удаления фигуры из группы ===
+        
+        private bool _isRemoveFromGroupMode;
+        private GroupShape? _removeFromGroupTarget;
+        
         // === Режим пошагового построения многоугольника ===
         
         /// <summary>
@@ -227,6 +233,7 @@ namespace OOTPiSP_LR1
             
             // Стандартные фигуры
             _createShapeMenu.Items.Add("Окружность", null, CreateCircle_Click!);
+            _createShapeMenu.Items.Add("Эллипс", null, CreateEllipse_Click!);
             _createShapeMenu.Items.Add("Прямоугольник", null, CreateRectangle_Click!);
             _createShapeMenu.Items.Add("Треугольник", null, CreateTriangle_Click!);
             _createShapeMenu.Items.Add("Шестиугольник", null, CreateHexagon_Click!);
@@ -260,11 +267,15 @@ namespace OOTPiSP_LR1
             // Группировка
             _createShapeMenu.Items.Add("📦 Сгруппировать (Ctrl+G)", null, GroupShapes_Click!);
             _createShapeMenu.Items.Add("📂 Разгруппировать (Ctrl+Shift+G)", null, UngroupShape_Click!);
+            _createShapeMenu.Items.Add("➕ Добавить в группу (Ctrl+Shift+A)", null, AddToGroup_Click!);
+            _createShapeMenu.Items.Add("➖ Удалить из группы (Ctrl+Shift+R)", null, RemoveFromGroup_Click!);
 
             _createShapeMenu.Items.Add(new ToolStripSeparator());
 
             _createShapeMenu.Items.Add("💾 Сохранить всё (Ctrl+S)", null, SaveShapes_Click!);
             _createShapeMenu.Items.Add("💾 Сохранить выделенное", null, SaveSelectedShapes_Click!);
+            _createShapeMenu.Items.Add(new ToolStripSeparator());
+            _createShapeMenu.Items.Add("📂 Открыть полотно (Ctrl+O)", null, OpenCanvas_Click!);
             _createShapeMenu.Items.Add("📂 Импортировать фигуры", null, ImportShapes_Click!);
         }
 
@@ -337,6 +348,12 @@ namespace OOTPiSP_LR1
                 DrawPolygonPreview(e.Graphics);
                 DrawDrawingModeIndicator(e.Graphics);
             }
+            
+            // === Отрисовка в режиме удаления из группы ===
+            if (_isRemoveFromGroupMode)
+            {
+                DrawRemoveFromGroupModeIndicator(e.Graphics);
+            }
         }
 
         /// <summary>
@@ -367,6 +384,13 @@ namespace OOTPiSP_LR1
             if (_isDrawingMode)
             {
                 HandleDrawingClick(e);
+                return;
+            }
+            
+            // В режиме удаления из группы обрабатываем отдельно
+            if (_isRemoveFromGroupMode)
+            {
+                HandleRemoveFromGroupClick(e);
                 return;
             }
             
@@ -607,6 +631,22 @@ namespace OOTPiSP_LR1
                 return;
             }
 
+            // Ctrl+Shift+A — добавить выбранную фигуру в группу
+            if (e.Control && e.Shift && e.KeyCode == Keys.A)
+            {
+                AddToGroup_Click(sender, e);
+                e.Handled = true;
+                return;
+            }
+
+            // Ctrl+Shift+R — удалить элемент из группы
+            if (e.Control && e.Shift && e.KeyCode == Keys.R)
+            {
+                RemoveFromGroup_Click(sender, e);
+                e.Handled = true;
+                return;
+            }
+
             // Ctrl+S — сохранить
             if (e.Control && !e.Shift && e.KeyCode == Keys.S)
             {
@@ -615,16 +655,19 @@ namespace OOTPiSP_LR1
                 return;
             }
 
-            // Ctrl+O — импортировать фигуры
+            // Ctrl+O — открыть полотно
             if (e.Control && !e.Shift && e.KeyCode == Keys.O)
             {
-                ImportShapesFromFile(new Point(ClientSize.Width / 2, ClientSize.Height / 2));
+                OpenCanvasFromFile();
                 e.Handled = true;
                 return;
             }
             
             switch (e.KeyCode)
             {
+                case Keys.F3:
+                    ToggleShapeListPanel();
+                    break;
                 case Keys.F4:
                     TogglePropertiesPanel();
                     break;
@@ -640,6 +683,12 @@ namespace OOTPiSP_LR1
             {
                 _propertiesPanel.SetShape(_shapeManager.SelectedShape);
             }
+        }
+
+        private void ToggleShapeListPanel()
+        {
+            _shapeListPanelVisible = !_shapeListPanelVisible;
+            _shapeListPanel.Visible = _shapeListPanelVisible;
         }
 
         private void PropertiesPanel_ShapeChanged(object? sender, EventArgs e)
@@ -687,6 +736,18 @@ namespace OOTPiSP_LR1
             circle.SetBorder(0, 10f, Color.DarkBlue);
             _shapeManager.AddShape(circle);
             _shapeManager.Select(circle);
+            Invalidate();
+        }
+
+        private void CreateEllipse_Click(object? sender, EventArgs e)
+        {
+            var ellipse = new EllipseShape(_menuClickLocation, 120, 70)
+            {
+                FillColor = Color.LightCyan
+            };
+            ellipse.SetBorder(0, 10f, Color.Teal);
+            _shapeManager.AddShape(ellipse);
+            _shapeManager.Select(ellipse);
             Invalidate();
         }
 
@@ -949,6 +1010,76 @@ namespace OOTPiSP_LR1
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
+        }
+
+        private void AddToGroup_Click(object? sender, EventArgs e)
+        {
+            var selectedShapes = _shapeManager.GetSelectedShapes();
+
+            GroupShape? targetGroup = null;
+            ShapeBase? shapeToAdd = null;
+
+            foreach (var s in selectedShapes)
+            {
+                if (s is GroupShape g)
+                    targetGroup ??= g;
+                else
+                    shapeToAdd ??= s;
+            }
+
+            if (targetGroup != null && shapeToAdd != null)
+            {
+                if (_shapeManager.AddShapeToGroup(shapeToAdd, targetGroup))
+                {
+                    if (_propertiesPanelVisible)
+                        _propertiesPanel.SetShape(targetGroup);
+                    Invalidate();
+                }
+            }
+            else
+            {
+                MessageBox.Show(
+                    "Выделите группу и одну фигуру (Ctrl+клик) для добавления фигуры в группу",
+                    "Добавление в группу",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+        }
+
+        private void RemoveFromGroup_Click(object? sender, EventArgs e)
+        {
+            if (_isRemoveFromGroupMode)
+            {
+                CancelRemoveFromGroupMode();
+                return;
+            }
+
+            if (_shapeManager.SelectedShape is not GroupShape group)
+            {
+                MessageBox.Show(
+                    "Выберите группу фигур",
+                    "Удаление из группы",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            var children = group.GetChildren();
+            if (children.Count == 0) return;
+            if (children.Count == 1)
+            {
+                MessageBox.Show(
+                    "В группе только одна фигура. Используйте разгруппировку (Ctrl+Shift+G).",
+                    "Удаление из группы",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            _isRemoveFromGroupMode = true;
+            _removeFromGroupTarget = group;
+            Cursor = Cursors.Cross;
+            Invalidate();
         }
 
         /// <summary>
@@ -1238,6 +1369,40 @@ namespace OOTPiSP_LR1
             Invalidate();
         }
 
+        private void HandleRemoveFromGroupClick(MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left) return;
+
+            var group = _removeFromGroupTarget;
+            if (group == null)
+            {
+                CancelRemoveFromGroupMode();
+                return;
+            }
+
+            var hitChild = group.HitTestChild(e.Location);
+            if (hitChild != null)
+            {
+                var removed = _shapeManager.RemoveShapeFromGroup(hitChild, group);
+                if (removed != null)
+                {
+                    if (_propertiesPanelVisible)
+                        _propertiesPanel.SetShape(_shapeManager.SelectedShape);
+                    RefreshShapeList();
+                }
+            }
+
+            CancelRemoveFromGroupMode();
+        }
+
+        private void CancelRemoveFromGroupMode()
+        {
+            _isRemoveFromGroupMode = false;
+            _removeFromGroupTarget = null;
+            Cursor = Cursors.Default;
+            Invalidate();
+        }
+
         /// <summary>
         /// Сбросить состояние рисования
         /// </summary>
@@ -1376,6 +1541,25 @@ namespace OOTPiSP_LR1
             }
         }
 
+        private void DrawRemoveFromGroupModeIndicator(Graphics g)
+        {
+            if (!_isRemoveFromGroupMode) return;
+            
+            string modeText = "УДАЛЕНИЕ ИЗ ГРУППЫ | Клик по фигуре внутри группы - удалить | Esc - отмена";
+            
+            using (var font = new Font("Segoe UI", 14F, FontStyle.Bold))
+            using (var brush = new SolidBrush(Color.White))
+            using (var bgBrush = new SolidBrush(Color.FromArgb(231, 76, 60)))
+            {
+                var textSize = g.MeasureString(modeText, font);
+                var rect = new RectangleF(0, 0, ClientSize.Width, 40);
+                
+                g.FillRectangle(bgBrush, rect);
+                g.DrawString(modeText, font, brush, 
+                    (ClientSize.Width - textSize.Width) / 2, 10);
+            }
+        }
+
         #endregion
 
         #region Сохранение/Загрузка
@@ -1400,6 +1584,11 @@ namespace OOTPiSP_LR1
             ImportShapesFromFile(_menuClickLocation);
         }
 
+        private void OpenCanvas_Click(object? sender, EventArgs e)
+        {
+            OpenCanvasFromFile();
+        }
+
         private void SaveShapesToFile()
         {
             using (var dialog = new SaveFileDialog())
@@ -1419,6 +1608,32 @@ namespace OOTPiSP_LR1
                     catch (Exception ex)
                     {
                         MessageBox.Show($"Ошибка при сохранении: {ex.Message}", "Ошибка",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        private void OpenCanvasFromFile()
+        {
+            using (var dialog = new OpenFileDialog())
+            {
+                dialog.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*";
+                dialog.DefaultExt = "json";
+                dialog.Title = "Открыть полотно";
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        _shapeManager.LoadFromFile(dialog.FileName);
+                        if (_propertiesPanelVisible)
+                            _propertiesPanel.SetShape(null);
+                        Invalidate();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ошибка при открытии: {ex.Message}", "Ошибка",
                             MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
@@ -1501,6 +1716,16 @@ namespace OOTPiSP_LR1
             // ESC всегда закрывает форму
             if (keyData == Keys.Escape)
             {
+                if (_isRemoveFromGroupMode)
+                {
+                    CancelRemoveFromGroupMode();
+                    return true;
+                }
+                if (_isDrawingMode)
+                {
+                    CancelDrawing();
+                    return true;
+                }
                 Close();
                 return true;
             }

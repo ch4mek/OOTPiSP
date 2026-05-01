@@ -1038,6 +1038,7 @@ namespace OOTPiSP_LR1.Shapes
             return type switch
             {
                 "CircleShape" => CircleShape.LoadFromJson(json),
+                "EllipseShape" => EllipseShape.LoadFromJson(json),
                 "RectangleShape" => RectangleShape.LoadFromJson(json),
                 "TriangleShape" => TriangleShape.LoadFromJson(json),
                 "HexagonShape" => HexagonShape.LoadFromJson(json),

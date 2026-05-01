@@ -35,8 +35,8 @@ namespace OOTPiSP_LR1
             _treeView = new TreeView
             {
                 Dock = DockStyle.Fill,
-                Font = new Font("Segoe UI", 10F),
-                ItemHeight = 26,
+                Font = new Font("Segoe UI", 15F),
+                ItemHeight = 39,
                 ShowLines = true,
                 ShowPlusMinus = true,
                 ShowRootLines = true,
