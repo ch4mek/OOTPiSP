@@ -196,6 +196,13 @@ namespace OOTPiSP_LR1.Shapes
                 g.DrawEllipse(pen, f1.X - r, f1.Y - r, r * 2, r * 2);
                 g.DrawEllipse(pen, f2.X - r, f2.Y - r, r * 2, r * 2);
             }
+
+            using (var font = new Font("Segoe UI", 8F, FontStyle.Bold))
+            using (var brush = new SolidBrush(Color.DarkRed))
+            {
+                g.DrawString("1", font, brush, f1.X + r + 2, f1.Y - r - 2);
+                g.DrawString("2", font, brush, f2.X + r + 2, f2.Y - r - 2);
+            }
         }
 
         public override bool HitTest(Point p)

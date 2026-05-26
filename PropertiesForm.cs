@@ -1193,6 +1193,7 @@ namespace OOTPiSP_LR1
         private Button? _ellipseBorderColorBtn;
         private Button? _ellipseApplyButton;
         private TextBox? _ellipseHintAngleText;
+        private ComboBox? _ellipseHintPivotCombo;
         private Button? _ellipseHintButton;
         private Label? _ellipseHintLabel;
 
@@ -1203,7 +1204,7 @@ namespace OOTPiSP_LR1
             _ellipsePanel = new Panel
             {
                 Location = new Point(10, 560),
-                Size = new Size(260, 380),
+                Size = new Size(260, 405),
                 BorderStyle = BorderStyle.FixedSingle
             };
 
@@ -1302,10 +1303,30 @@ namespace OOTPiSP_LR1
             };
             _ellipsePanel.Controls.Add(_ellipseHintAngleText);
 
+            var hintPivotLabel = new Label
+            {
+                Text = "Вращать отн.:",
+                Location = new Point(5, 293),
+                Size = new Size(75, 18),
+                Font = new Font("Segoe UI", 9F)
+            };
+            _ellipsePanel.Controls.Add(hintPivotLabel);
+
+            _ellipseHintPivotCombo = new ComboBox
+            {
+                Location = new Point(83, 291),
+                Size = new Size(120, 22),
+                Font = new Font("Segoe UI", 9F),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Items = { "Фокус 1", "Фокус 2", "Центр" },
+                SelectedIndex = 2
+            };
+            _ellipsePanel.Controls.Add(_ellipseHintPivotCombo);
+
             _ellipseHintButton = new Button
             {
                 Text = "Рассчитать",
-                Location = new Point(135, 266),
+                Location = new Point(135, 316),
                 Size = new Size(80, 26),
                 Font = new Font("Segoe UI", 9F)
             };
@@ -1314,8 +1335,8 @@ namespace OOTPiSP_LR1
 
             _ellipseHintLabel = new Label
             {
-                Location = new Point(5, 298),
-                Size = new Size(248, 75),
+                Location = new Point(5, 348),
+                Size = new Size(248, 50),
                 Font = new Font("Segoe UI", 8.5F),
                 ForeColor = Color.FromArgb(30, 30, 120)
             };
@@ -1473,19 +1494,53 @@ namespace OOTPiSP_LR1
 
             var curF1 = ellipse.GetFocus1();
             var curF2 = ellipse.GetFocus2();
+            var center = ellipse.GetCenter();
 
-            double newF2X = curF1.X + 2 * c * Math.Cos(newRad);
-            double newF2Y = curF1.Y + 2 * c * Math.Sin(newRad);
+            string pivotName = _ellipseHintPivotCombo!.SelectedItem?.ToString() ?? "Центр";
 
-            double dX = newF2X - curF2.X;
-            double dY = newF2Y - curF2.Y;
+            double newF1X, newF1Y, newF2X, newF2Y;
+            string f1Status, f2Status;
 
-            string sign(double v) => v >= 0 ? "+" : "";
+            if (pivotName == "Фокус 1")
+            {
+                newF1X = curF1.X;
+                newF1Y = curF1.Y;
+                newF2X = curF1.X - 2 * c * Math.Cos(newRad);
+                newF2Y = curF1.Y - 2 * c * Math.Sin(newRad);
+                f1Status = $"без изменений ({(int)Math.Round(curF1.X)}, {(int)Math.Round(curF1.Y)})";
+                f2Status = FormatFocusResult("Фокус 2", curF2, newF2X, newF2Y);
+            }
+            else if (pivotName == "Фокус 2")
+            {
+                newF2X = curF2.X;
+                newF2Y = curF2.Y;
+                newF1X = curF2.X + 2 * c * Math.Cos(newRad);
+                newF1Y = curF2.Y + 2 * c * Math.Sin(newRad);
+                f1Status = FormatFocusResult("Фокус 1", curF1, newF1X, newF1Y);
+                f2Status = $"без изменений ({(int)Math.Round(curF2.X)}, {(int)Math.Round(curF2.Y)})";
+            }
+            else
+            {
+                newF1X = center.X + c * Math.Cos(newRad);
+                newF1Y = center.Y + c * Math.Sin(newRad);
+                newF2X = center.X - c * Math.Cos(newRad);
+                newF2Y = center.Y - c * Math.Sin(newRad);
+                f1Status = FormatFocusResult("Фокус 1", curF1, newF1X, newF1Y);
+                f2Status = FormatFocusResult("Фокус 2", curF2, newF2X, newF2Y);
+            }
 
             _ellipseHintLabel!.Text =
-                $"Фокус 1: без изменений ({(int)Math.Round(curF1.X)}, {(int)Math.Round(curF1.Y)})\n" +
-                $"Фокус 2: ({Math.Round(newF2X)}, {Math.Round(newF2Y)})  ({sign(dX)}{Math.Round(dX)}, {sign(dY)}{Math.Round(dY)})\n" +
+                $"Фокус 1: {f1Status}\n" +
+                $"Фокус 2: {f2Status}\n" +
                 $"Угол: {ellipse.RotationDegrees}° → {ellipse.RotationDegrees + deltaAngle:F1}°";
+        }
+
+        private static string FormatFocusResult(string name, PointF oldF, double newX, double newY)
+        {
+            double dX = newX - oldF.X;
+            double dY = newY - oldF.Y;
+            string sign(double v) => v >= 0 ? "+" : "";
+            return $"({Math.Round(newX)}, {Math.Round(newY)})  ({sign(dX)}{Math.Round(dX)}, {sign(dY)}{Math.Round(dY)})";
         }
 
         #endregion
