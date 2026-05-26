@@ -13,4 +13,29 @@
     <PackageReference Include="Clipper2" Version="1.5.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="Shapes\PolygonBasedShape.cs" />
+    <Compile Remove="Shapes\EllipseBasedShape.cs" />
+    <Compile Remove="Shapes\RectangleShape.cs" />
+    <Compile Remove="Shapes\TriangleShape.cs" />
+    <Compile Remove="Shapes\HexagonShape.cs" />
+    <Compile Remove="Shapes\TrapezoidShape.cs" />
+    <Compile Remove="Shapes\CircleShape.cs" />
+    <Compile Remove="Shapes\EllipseShape.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Shapes\PolygonBasedShape.cs" />
+    <Compile Include="Shapes\RectangleShape.cs" DependentUpon="PolygonBasedShape.cs" />
+    <Compile Include="Shapes\TriangleShape.cs" DependentUpon="PolygonBasedShape.cs" />
+    <Compile Include="Shapes\HexagonShape.cs" DependentUpon="PolygonBasedShape.cs" />
+    <Compile Include="Shapes\TrapezoidShape.cs" DependentUpon="PolygonBasedShape.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Shapes\EllipseBasedShape.cs" />
+    <Compile Include="Shapes\CircleShape.cs" DependentUpon="EllipseBasedShape.cs" />
+    <Compile Include="Shapes\EllipseShape.cs" DependentUpon="EllipseBasedShape.cs" />
+  </ItemGroup>
+
 </Project>

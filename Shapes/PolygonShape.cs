@@ -758,8 +758,8 @@ namespace OOTPiSP_LR1.Shapes
                 {
                     var segObj = segNode!.AsObject();
                     shape.AddSegmentByLengthAngle(
-                        (float)segObj["length"]!.GetValue<double>(),
-                        (float)segObj["angleDegrees"]!.GetValue<double>()
+                        GetFloatFromJsonNode(segObj["length"]!),
+                        GetFloatFromJsonNode(segObj["angleDegrees"]!)
                     );
                 }
             }

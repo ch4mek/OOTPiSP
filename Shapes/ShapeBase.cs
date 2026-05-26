@@ -1013,7 +1013,7 @@ namespace OOTPiSP_LR1.Shapes
                 int borderCount = Math.Min(SideCount, Math.Min(bw.Count, bc.Count));
                 for (int i = 0; i < borderCount; i++)
                 {
-                    BorderWidths[i] = (float)bw[i]!.GetValue<double>();
+                    BorderWidths[i] = GetFloatFromJsonNode(bw[i]!);
                     BorderColors[i] = LoadColor(bc[i]!.GetValue<string>());
                 }
             }
@@ -1055,6 +1055,18 @@ namespace OOTPiSP_LR1.Shapes
         protected static JsonObject SavePointF(PointF p) => new() { ["x"] = p.X, ["y"] = p.Y };
         protected static PointF LoadPointF(JsonObject json) => new(json["x"]!.GetValue<float>(), json["y"]!.GetValue<float>());
         protected static string SaveColor(Color c) => $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}";
+
+        protected static float GetFloatFromJsonNode(JsonNode node)
+        {
+            try
+            {
+                return (float)node.GetValue<double>();
+            }
+            catch (InvalidOperationException)
+            {
+                return node.GetValue<float>();
+            }
+        }
         protected static Color LoadColor(string hex)
         {
             if (hex.StartsWith("#")) hex = hex.Substring(1);

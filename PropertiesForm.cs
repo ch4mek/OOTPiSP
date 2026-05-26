@@ -141,6 +141,7 @@ namespace OOTPiSP_LR1
             UpdatePolygonSegmentPanel();
             UpdateCompositePanel();
             UpdateGroupPanel();
+            UpdateEllipsePanel();
         }
 
         /// <summary>
@@ -223,6 +224,10 @@ namespace OOTPiSP_LR1
             if (_shape is CircleShape circle)
             {
                 AddBorderControl(0, "Линия", circle.CircleBorderWidth, circle.CircleBorderColor);
+            }
+            else if (_shape is EllipseShape ellipse)
+            {
+                AddBorderControl(0, "Линия", ellipse.EllipseBorderWidth, ellipse.EllipseBorderColor);
             }
             else
             {
@@ -347,6 +352,10 @@ namespace OOTPiSP_LR1
                 {
                     circle.CircleBorderWidth = width;
                 }
+                else if (_shape is EllipseShape ellipse)
+                {
+                    ellipse.EllipseBorderWidth = width;
+                }
                 else
                 {
                     _shape.SetBorderWidth(index, width);
@@ -373,6 +382,10 @@ namespace OOTPiSP_LR1
                     if (_shape is CircleShape circle)
                     {
                         circle.CircleBorderColor = dialog.Color;
+                    }
+                    else if (_shape is EllipseShape ellipse)
+                    {
+                        ellipse.EllipseBorderColor = dialog.Color;
                     }
                     else
                     {
@@ -1161,8 +1174,318 @@ namespace OOTPiSP_LR1
         {
             if (_shape is not GroupShape) return;
             
-            // Вызываем событие разгруппировки
             UngroupRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        #endregion
+
+        #region EllipseShape Editing
+
+        private Panel? _ellipsePanel;
+        private TextBox? _ellipseSemiMajorText;
+        private TextBox? _ellipseSemiMinorText;
+        private TextBox? _ellipseF1XText;
+        private TextBox? _ellipseF1YText;
+        private TextBox? _ellipseF2XText;
+        private TextBox? _ellipseF2YText;
+        private TextBox? _ellipseRotationText;
+        private TextBox? _ellipseBorderWidthText;
+        private Button? _ellipseBorderColorBtn;
+        private Button? _ellipseApplyButton;
+        private TextBox? _ellipseHintAngleText;
+        private Button? _ellipseHintButton;
+        private Label? _ellipseHintLabel;
+
+        private void CreateEllipsePanel()
+        {
+            if (_ellipsePanel != null) return;
+
+            _ellipsePanel = new Panel
+            {
+                Location = new Point(10, 560),
+                Size = new Size(260, 380),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            var titleLabel = new Label
+            {
+                Text = "Параметры эллипса:",
+                Location = new Point(5, 5),
+                Size = new Size(200, 20),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+            _ellipsePanel.Controls.Add(titleLabel);
+
+            var labelA = new Label { Text = "Полуось a:", Location = new Point(5, 30), Size = new Size(80, 20), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(labelA);
+            _ellipseSemiMajorText = new TextBox { Location = new Point(90, 28), Size = new Size(60, 22), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(_ellipseSemiMajorText);
+
+            var labelB = new Label { Text = "Полуось b:", Location = new Point(5, 55), Size = new Size(80, 20), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(labelB);
+            _ellipseSemiMinorText = new TextBox { Location = new Point(90, 53), Size = new Size(60, 22), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(_ellipseSemiMinorText);
+
+            var labelF1 = new Label { Text = "Фокус 1", Location = new Point(5, 80), Size = new Size(55, 20), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(labelF1);
+            var labelF1X = new Label { Text = "X:", Location = new Point(60, 80), Size = new Size(18, 20), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(labelF1X);
+            _ellipseF1XText = new TextBox { Location = new Point(78, 78), Size = new Size(50, 22), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(_ellipseF1XText);
+            var labelF1Y = new Label { Text = "Y:", Location = new Point(133, 80), Size = new Size(18, 20), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(labelF1Y);
+            _ellipseF1YText = new TextBox { Location = new Point(151, 78), Size = new Size(50, 22), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(_ellipseF1YText);
+
+            var labelF2 = new Label { Text = "Фокус 2", Location = new Point(5, 105), Size = new Size(55, 20), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(labelF2);
+            var labelF2X = new Label { Text = "X:", Location = new Point(60, 105), Size = new Size(18, 20), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(labelF2X);
+            _ellipseF2XText = new TextBox { Location = new Point(78, 103), Size = new Size(50, 22), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(_ellipseF2XText);
+            var labelF2Y = new Label { Text = "Y:", Location = new Point(133, 105), Size = new Size(18, 20), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(labelF2Y);
+            _ellipseF2YText = new TextBox { Location = new Point(151, 103), Size = new Size(50, 22), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(_ellipseF2YText);
+
+            var labelRot = new Label { Text = "Поворот (°):", Location = new Point(5, 130), Size = new Size(80, 20), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(labelRot);
+            _ellipseRotationText = new TextBox { Location = new Point(90, 128), Size = new Size(60, 22), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(_ellipseRotationText);
+
+            var labelBW = new Label { Text = "Толщина:", Location = new Point(5, 155), Size = new Size(80, 20), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(labelBW);
+            _ellipseBorderWidthText = new TextBox { Location = new Point(90, 153), Size = new Size(60, 22), Font = new Font("Segoe UI", 9F) };
+            _ellipseBorderWidthText.TextChanged += EllipseBorderWidth_TextChanged;
+            _ellipsePanel.Controls.Add(_ellipseBorderWidthText);
+
+            var labelBC = new Label { Text = "Цвет обводки:", Location = new Point(5, 180), Size = new Size(80, 20), Font = new Font("Segoe UI", 9F) };
+            _ellipsePanel.Controls.Add(labelBC);
+            _ellipseBorderColorBtn = new Button { Location = new Point(90, 178), Size = new Size(60, 22) };
+            _ellipseBorderColorBtn.Click += EllipseBorderColor_Click;
+            _ellipsePanel.Controls.Add(_ellipseBorderColorBtn);
+
+            _ellipseApplyButton = new Button
+            {
+                Text = "Применить",
+                Location = new Point(5, 210),
+                Size = new Size(145, 28),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+            _ellipseApplyButton.Click += EllipseApplyButton_Click;
+            _ellipsePanel.Controls.Add(_ellipseApplyButton);
+
+            var hintTitleLabel = new Label
+            {
+                Text = "Подсказка поворота:",
+                Location = new Point(5, 248),
+                Size = new Size(200, 18),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+            _ellipsePanel.Controls.Add(hintTitleLabel);
+
+            var hintAngleLabel = new Label
+            {
+                Text = "Угол Δ (°):",
+                Location = new Point(5, 270),
+                Size = new Size(70, 18),
+                Font = new Font("Segoe UI", 9F)
+            };
+            _ellipsePanel.Controls.Add(hintAngleLabel);
+
+            _ellipseHintAngleText = new TextBox
+            {
+                Location = new Point(78, 268),
+                Size = new Size(50, 22),
+                Font = new Font("Segoe UI", 9F),
+                Text = "45"
+            };
+            _ellipsePanel.Controls.Add(_ellipseHintAngleText);
+
+            _ellipseHintButton = new Button
+            {
+                Text = "Рассчитать",
+                Location = new Point(135, 266),
+                Size = new Size(80, 26),
+                Font = new Font("Segoe UI", 9F)
+            };
+            _ellipseHintButton.Click += EllipseHintButton_Click;
+            _ellipsePanel.Controls.Add(_ellipseHintButton);
+
+            _ellipseHintLabel = new Label
+            {
+                Location = new Point(5, 298),
+                Size = new Size(248, 75),
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = Color.FromArgb(30, 30, 120)
+            };
+            _ellipsePanel.Controls.Add(_ellipseHintLabel);
+
+            Controls.Add(_ellipsePanel);
+        }
+
+        private void UpdateEllipsePanel()
+        {
+            if (_shape is not EllipseShape ellipse)
+            {
+                if (_ellipsePanel != null)
+                    _ellipsePanel.Visible = false;
+                panelBorders.Visible = true;
+                labelBorders.Visible = true;
+                return;
+            }
+
+            CreateEllipsePanel();
+            _ellipsePanel!.Visible = true;
+            _ellipsePanel.BringToFront();
+            panelBorders.Visible = false;
+            labelBorders.Visible = false;
+
+            _ellipseSemiMajorText!.Text = ellipse.SemiMajor.ToString();
+            _ellipseSemiMinorText!.Text = ellipse.SemiMinor.ToString();
+
+            var f1 = ellipse.GetFocus1();
+            var f2 = ellipse.GetFocus2();
+            _ellipseF1XText!.Text = ((int)Math.Round(f1.X)).ToString();
+            _ellipseF1YText!.Text = ((int)Math.Round(f1.Y)).ToString();
+            _ellipseF2XText!.Text = ((int)Math.Round(f2.X)).ToString();
+            _ellipseF2YText!.Text = ((int)Math.Round(f2.Y)).ToString();
+
+            _ellipseRotationText!.Text = ((int)ellipse.RotationDegrees).ToString();
+
+            _ellipseBorderWidthText!.TextChanged -= EllipseBorderWidth_TextChanged;
+            _ellipseBorderWidthText.Text = ellipse.EllipseBorderWidth.ToString();
+            _ellipseBorderWidthText.TextChanged += EllipseBorderWidth_TextChanged;
+
+            _ellipseBorderColorBtn!.BackColor = ellipse.EllipseBorderColor;
+
+            if (_ellipseHintLabel != null)
+                _ellipseHintLabel.Text = "";
+        }
+
+        private void EllipseBorderWidth_TextChanged(object? sender, EventArgs e)
+        {
+            if (_shape is not EllipseShape ellipse) return;
+            if (float.TryParse(_ellipseBorderWidthText!.Text, out float w) && w > 0)
+            {
+                ellipse.EllipseBorderWidth = w;
+                ellipse.RefreshBounds();
+                ShapeChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        private void EllipseBorderColor_Click(object? sender, EventArgs e)
+        {
+            if (_shape is not EllipseShape ellipse) return;
+            using (var dialog = new ColorDialog())
+            {
+                dialog.Color = ellipse.EllipseBorderColor;
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    ellipse.EllipseBorderColor = dialog.Color;
+                    _ellipseBorderColorBtn!.BackColor = dialog.Color;
+                    ShapeChanged?.Invoke(this, EventArgs.Empty);
+                }
+            }
+        }
+
+        private void EllipseApplyButton_Click(object? sender, EventArgs e)
+        {
+            if (_shape is not EllipseShape ellipse) return;
+
+            bool changed = false;
+
+            var curF1 = ellipse.GetFocus1();
+            var curF2 = ellipse.GetFocus2();
+
+            bool fociChanged = false;
+            float f1X = curF1.X, f1Y = curF1.Y, f2X = curF2.X, f2Y = curF2.Y;
+
+            if (float.TryParse(_ellipseF1XText!.Text, out float parsedF1X))
+                f1X = parsedF1X;
+            if (float.TryParse(_ellipseF1YText!.Text, out float parsedF1Y))
+                f1Y = parsedF1Y;
+            if (float.TryParse(_ellipseF2XText!.Text, out float parsedF2X))
+                f2X = parsedF2X;
+            if (float.TryParse(_ellipseF2YText!.Text, out float parsedF2Y))
+                f2Y = parsedF2Y;
+
+            double eps = 0.5;
+            if (Math.Abs(f1X - curF1.X) > eps || Math.Abs(f1Y - curF1.Y) > eps ||
+                Math.Abs(f2X - curF2.X) > eps || Math.Abs(f2Y - curF2.Y) > eps)
+            {
+                fociChanged = true;
+            }
+
+            if (fociChanged)
+            {
+                ellipse.SetFromFoci(new PointF(f1X, f1Y), new PointF(f2X, f2Y));
+                changed = true;
+            }
+            else
+            {
+                int newA = ellipse.SemiMajor;
+                int newB = ellipse.SemiMinor;
+
+                if (int.TryParse(_ellipseSemiMajorText!.Text, out int a) && a >= 10)
+                    newA = a;
+
+                if (int.TryParse(_ellipseSemiMinorText!.Text, out int b) && b >= 10)
+                    newB = b;
+
+                if (newB > newA)
+                    (newA, newB) = (newB, newA);
+
+                if (newA != ellipse.SemiMajor || newB != ellipse.SemiMinor)
+                {
+                    ellipse.SemiMajor = newA;
+                    ellipse.SemiMinor = newB;
+                    changed = true;
+                }
+
+                if (float.TryParse(_ellipseRotationText!.Text, out float rot))
+                {
+                    if (Math.Abs(rot - ellipse.RotationDegrees) > 0.01f)
+                    {
+                        ellipse.RotationDegrees = rot;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (changed)
+            {
+                ellipse.SetAnchorPosition(ellipse.AnchorPos);
+            }
+
+            UpdateEllipsePanel();
+            UpdateProperties();
+            ShapeChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void EllipseHintButton_Click(object? sender, EventArgs e)
+        {
+            if (_shape is not EllipseShape ellipse) return;
+            if (!float.TryParse(_ellipseHintAngleText!.Text, out float deltaAngle)) return;
+
+            double c = ellipse.FocalDistance;
+            double newRad = (ellipse.RotationDegrees + deltaAngle) * Math.PI / 180.0;
+
+            var curF1 = ellipse.GetFocus1();
+            var curF2 = ellipse.GetFocus2();
+
+            double newF2X = curF1.X + 2 * c * Math.Cos(newRad);
+            double newF2Y = curF1.Y + 2 * c * Math.Sin(newRad);
+
+            double dX = newF2X - curF2.X;
+            double dY = newF2Y - curF2.Y;
+
+            string sign(double v) => v >= 0 ? "+" : "";
+
+            _ellipseHintLabel!.Text =
+                $"Фокус 1: без изменений ({(int)Math.Round(curF1.X)}, {(int)Math.Round(curF1.Y)})\n" +
+                $"Фокус 2: ({Math.Round(newF2X)}, {Math.Round(newF2Y)})  ({sign(dX)}{Math.Round(dX)}, {sign(dY)}{Math.Round(dY)})\n" +
+                $"Угол: {ellipse.RotationDegrees}° → {ellipse.RotationDegrees + deltaAngle:F1}°";
         }
 
         #endregion

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
@@ -414,9 +415,11 @@ namespace OOTPiSP_LR1.Core
 
         public void SaveShapesToFile(string path, IEnumerable<ShapeBase> shapes)
         {
+            var shapeList = shapes as IList<ShapeBase> ?? shapes.ToList();
+
             var root = new JsonObject();
             var shapesArray = new JsonArray();
-            foreach (var shape in shapes)
+            foreach (var shape in shapeList)
             {
                 shapesArray.Add(shape.Save());
             }
@@ -426,6 +429,66 @@ namespace OOTPiSP_LR1.Core
             options.TypeInfoResolver = new DefaultJsonTypeInfoResolver();
             var jsonString = root.ToJsonString(options);
             File.WriteAllText(path, jsonString);
+
+            string txtPath = Path.ChangeExtension(path, ".txt");
+            File.WriteAllText(txtPath, GenerateTextReport(shapeList));
+        }
+
+        private static string GenerateTextReport(IList<ShapeBase> shapes)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"Отчёт полотна — {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
+            sb.AppendLine($"Всего фигур: {shapes.Count}");
+            sb.AppendLine(new string('-', 50));
+
+            for (int i = 0; i < shapes.Count; i++)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"Фигура #{i + 1}");
+                AppendShapeInfo(sb, shapes[i], 0);
+            }
+
+            return sb.ToString();
+        }
+
+        private static void AppendShapeInfo(StringBuilder sb, ShapeBase s, int indent)
+        {
+            string pad = new string(' ', indent * 2);
+            sb.AppendLine($"{pad}  Тип: {s.DefaultTypeName}");
+            sb.AppendLine($"{pad}  Имя: {s.DisplayName}");
+            sb.AppendLine($"{pad}  ID: {s.Id}");
+            sb.AppendLine($"{pad}  Позиция: ({s.GlobalOrigin.X}, {s.GlobalOrigin.Y})");
+            sb.AppendLine($"{pad}  Заливка: {s.FillColor.Name}");
+
+            if (s is GroupShape group)
+            {
+                sb.AppendLine($"{pad}  Фигур в группе: {group.ChildCount}");
+                var children = group.GetChildren();
+                for (int i = 0; i < children.Count; i++)
+                {
+                    sb.AppendLine($"{pad}  --- Дочерняя фигура #{i + 1} ---");
+                    AppendShapeInfo(sb, children[i], indent + 1);
+                }
+            }
+            else if (s is CompositeShape composite)
+            {
+                sb.AppendLine($"{pad}  Развёрнут: {composite.IsExpanded}");
+                sb.AppendLine($"{pad}  Дочерних фигур: {composite.ChildCount}");
+                var children = composite.GetChildren();
+                for (int i = 0; i < children.Count; i++)
+                {
+                    sb.AppendLine($"{pad}  --- Дочерняя фигура #{i + 1} ---");
+                    AppendShapeInfo(sb, children[i], indent + 1);
+                }
+            }
+            else
+            {
+                sb.AppendLine($"{pad}  Сторон: {s.SideCount}");
+                for (int j = 0; j < s.SideCount; j++)
+                {
+                    sb.AppendLine($"{pad}    Сторона {j + 1}: толщина={s.BorderWidths[j]:F1}, цвет={s.BorderColors[j].Name}");
+                }
+            }
         }
 
         public List<ShapeBase> AddFromFile(string path, Point targetCenter)
